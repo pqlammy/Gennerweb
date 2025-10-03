@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-color: #dc2626;
+  --primary-color-dark: #b91c1c;
+  --accent-color: #f97316;
+  --target-amount: 100;
+  --logo-color: #dc2626;
+  --background-gradient: linear-gradient(135deg, rgba(220,38,38,0.92) 0%, rgba(17,24,39,0.94) 65%);
+  --background-overlay-color: rgba(0, 0, 0, 0.6);
+  --background-overlay-opacity: 0.65;
+}
+
+select {
+  color: #f9fafb;
+  background-color: rgba(15, 23, 42, 0.6);
+}
+
+select:focus {
+  outline: none;
+}
+
+select option {
+  color: #111827;
+  background-color: #f9fafb;
+}
+
+select option:checked,
+select option:hover {
+  color: #ffffff;
+  background-color: #b91c1c;
+}
+
+.privacy-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f9fafb;
+  margin-top: 1.5rem;
+}
+
+.privacy-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f9fafb;
+  margin-top: 1.25rem;
+}
+
+.privacy-content p {
+  color: #e5e7eb;
+}
+
+.privacy-content ul,
+.privacy-content ol {
+  padding-left: 1.5rem;
+  color: #d1d5db;
+}
+
+.privacy-content li {
+  margin-bottom: 0.25rem;
+}
+
+.privacy-content a {
+  color: var(--accent-color);
+  text-decoration: underline;
+}
+
+.bg-primary {
+  background-color: var(--primary-color);
+}
+
+.bg-primary-dark {
+  background-color: var(--primary-color-dark);
+}
+
+.bg-primary-soft {
+  background-color: color-mix(in srgb, var(--primary-color) 20%, transparent);
+}
+
+.hover\:bg-primary-dark:hover {
+  background-color: var(--primary-color-dark);
+}
+
+.hover\:bg-primary-soft:hover {
+  background-color: color-mix(in srgb, var(--primary-color) 22%, transparent);
+}

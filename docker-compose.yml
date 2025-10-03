@@ -1,0 +1,70 @@
+services:
+  # PostgreSQL Database - EINFACH
+  db:
+    image: postgres:15
+    container_name: genner-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: genner_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init-simple.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Express.js Backend - EINFACH
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: genner-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/genner_db
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      PORT: 3001
+      DB_SSL: 'false'
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      SITE_URL: ${SITE_URL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-200}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-10}
+      JSON_BODY_LIMIT: ${JSON_BODY_LIMIT:-1mb}
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  # React App - OHNE SUPABASE
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_ENCRYPTION_KEY: ${VITE_ENCRYPTION_KEY}
+    container_name: genner-app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

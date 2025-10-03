@@ -1,0 +1,124 @@
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: genner-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: genner_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - genner-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Supabase Auth
+  auth:
+    image: supabase/gotrue:v2.132.3
+    container_name: genner-auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${SITE_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_HOST: db
+      GOTRUE_DB_PORT: 5432
+      GOTRUE_DB_DATABASE: genner_db
+      GOTRUE_DB_USERNAME: postgres
+      GOTRUE_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/genner_db?sslmode=disable
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
+      GOTRUE_DISABLE_SIGNUP: false
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      MAILER_AUTOCONFIRM: true
+      MAILER_SECURE_EMAIL_CHANGE_ENABLED: true
+    networks:
+      - genner-network
+    ports:
+      - "9999:9999"
+
+  # PostgREST API
+  api:
+    image: postgrest/postgrest:v11.2.0
+    container_name: genner-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/genner_db
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    networks:
+      - genner-network
+    ports:
+      - "3000:3000"
+
+  # Kong API Gateway
+  gateway:
+    image: kong:2.8.1
+    container_name: genner-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+    volumes:
+      - ./kong.yml:/var/lib/kong/kong.yml:ro
+    networks:
+      - genner-network
+    depends_on:
+      - auth
+      - api
+
+  # React App (wird später hinzugefügt)
+  app:
+    build: .
+    container_name: genner-app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      VITE_SUPABASE_URL: ${SITE_URL}
+      VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
+      VITE_ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - genner-network
+    depends_on:
+      - gateway
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  genner-network:
+    driver: bridge

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bestätigung deines Beitrags</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #111; line-height: 1.5; }
+      .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+      .header { border-bottom: 2px solid #aa1b1f; margin-bottom: 16px; padding-bottom: 8px; }
+      .footer { margin-top: 24px; font-size: 12px; color: #555; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Danke für deinen Beitrag!</h1>
+      </div>
+      <p>Hallo {{firstName}} {{lastName}},</p>
+      <p>
+        wir bestätigen dir hiermit den Eingang deines Beitrags in Höhe von
+        <strong>CHF {{amount}}</strong> via <strong>{{paymentMethod}}</strong>.
+      </p>
+      <p>
+        Dein Beitrag wurde von {{gennervogt}} am {{createdAt}} erfasst.
+      </p>
+      <p>
+        Herzlichen Dank für deine Unterstützung und bis bald beim nächsten Anlass!
+      </p>
+      <div class="footer">
+        <p>Genner Gibelguuger</p>
+        <p>Diese Nachricht wurde automatisch generiert. Bitte antworte nicht auf dieses E-Mail.</p>
+      </div>
+    </div>
+  </body>
+</html>
