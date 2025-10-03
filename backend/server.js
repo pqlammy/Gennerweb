@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
+const { execFile } = require('child_process');
 const path = require('path');
 let nodemailer;
 try {
@@ -40,6 +41,20 @@ if (additionalEnv) {
     .filter(Boolean)
     .forEach((entry) => registerEnvCandidate(entry));
 }
+
+const execCommand = (command, args = [], options = {}) =>
+  new Promise((resolve, reject) => {
+    execFile(command, args, options, (error, stdout, stderr) => {
+      if (error) {
+        const wrapped = new Error(`Command failed: ${command} ${args.join(' ')}\n${stderr || error.message}`);
+        wrapped.original = error;
+        wrapped.stdout = stdout;
+        wrapped.stderr = stderr;
+        return reject(wrapped);
+      }
+      resolve({ stdout, stderr });
+    });
+  });
 
 const envScanResults = [];
 const loadedEnvFiles = new Set();
@@ -3012,6 +3027,37 @@ app.get('/api/stats/leaderboard', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Leaderboard generation failed:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/admin/update/check', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const branch = process.env.UPDATE_BRANCH || 'main';
+    const repoDir = process.cwd();
+
+    await execCommand('git', ['fetch', 'origin', branch], { cwd: repoDir });
+
+    const aheadResult = await execCommand('git', ['rev-list', '--count', `HEAD..origin/${branch}`], { cwd: repoDir });
+    const behindResult = await execCommand('git', ['rev-list', '--count', `origin/${branch}..HEAD`], { cwd: repoDir });
+    const localCommitResult = await execCommand('git', ['rev-parse', 'HEAD'], { cwd: repoDir });
+    const remoteCommitResult = await execCommand('git', ['rev-parse', `origin/${branch}`], { cwd: repoDir });
+
+    const ahead = Number.parseInt(aheadResult.stdout.trim(), 10) || 0;
+    const behind = Number.parseInt(behindResult.stdout.trim(), 10) || 0;
+
+    res.json({
+      branch,
+      updateAvailable: ahead > 0,
+      ahead,
+      behind,
+      localCommit: localCommitResult.stdout.trim(),
+      remoteCommit: remoteCommitResult.stdout.trim(),
+      instructions: 'sudo /gennerweb/scripts/full-update.sh',
+      lastCheckedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Update check failed:', error);
+    res.status(500).json({ error: 'Update check failed', details: error.message });
   }
 });
 

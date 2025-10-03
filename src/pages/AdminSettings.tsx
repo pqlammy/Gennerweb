@@ -18,7 +18,8 @@ import {
   LogIn,
   Link2,
   Megaphone,
-  Activity
+  Activity,
+  RefreshCw
 } from 'lucide-react';
 import type {
   SiteSettings,
@@ -95,6 +96,17 @@ type SectionKey =
   | 'legal'
   | 'privacy'
   | 'operations';
+
+type UpdateInfo = {
+  branch: string;
+  updateAvailable: boolean;
+  ahead: number;
+  behind: number;
+  localCommit: string;
+  remoteCommit: string;
+  instructions: string;
+  lastCheckedAt: string;
+};
 
 const FORM_FIELD_DEFS: Array<{ field: keyof ContributionFormFieldsConfig; label: string; hint?: string }> = [
   { field: 'email', label: 'E-Mail-Adresse', hint: 'Pflicht für automatische Bestätigungsmails.' },
@@ -268,6 +280,9 @@ export function AdminSettings() {
     privacy: false,
     operations: false
   });
+  const [updateStatus, setUpdateStatus] = useState<UpdateInfo | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const toggleSection = (key: SectionKey) => {
     setSectionOpen((prev) => ({
@@ -449,6 +464,24 @@ export function AdminSettings() {
     });
     setNewPresetAmount('');
   };
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdate(true);
+    setUpdateError(null);
+    try {
+      const result = await api.checkUpdates();
+      setUpdateStatus(result);
+    } catch (err) {
+      console.error('Update check failed', err);
+      const message = err instanceof Error ? err.message : 'Update konnte nicht geprüft werden';
+      setUpdateError(message);
+      setUpdateStatus(null);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const updateBranchLabel = updateStatus?.branch ?? 'main';
 
   const handleFooterLinkChange = (index: number, field: keyof FooterLink, value: string) => {
     setForm((prev) => {
@@ -1398,6 +1431,56 @@ export function AdminSettings() {
                   />
                   <span>{form.featureFlags?.healthMonitor ? 'Aktiv' : 'Inaktiv'}</span>
                 </label>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-black/30 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Updates prüfen</p>
+                    <p className="text-xs text-gray-400">
+                      Vergleicht den aktuellen Stand mit <code className="bg-black/50 px-1">origin/{updateBranchLabel}</code> und liefert die Update-Anleitung.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCheckUpdates}
+                    disabled={checkingUpdate}
+                    className="inline-flex items-center gap-2 self-start rounded-md bg-white/10 px-3 py-1 text-xs text-gray-200 transition-colors hover:bg-white/20 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
+                    {checkingUpdate ? 'Prüfe …' : 'Jetzt prüfen'}
+                  </button>
+                </div>
+
+                {updateError && (
+                  <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                    {updateError}
+                  </p>
+                )}
+
+                {updateStatus && (
+                  <div className="rounded-md border border-white/10 bg-black/40 px-3 py-3 text-xs text-gray-200">
+                    <p className="text-sm font-semibold text-white">
+                      {updateStatus.updateAvailable ? 'Neue Version verfügbar' : 'Alles auf dem neuesten Stand'}
+                    </p>
+                    <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                      <p>Branch: <span className="text-white">{updateStatus.branch}</span></p>
+                      <p>Remote ahead: <span className="text-white">{updateStatus.ahead}</span></p>
+                      <p>Remote commit: <span className="font-mono text-gray-300">{updateStatus.remoteCommit.slice(0, 10)}</span></p>
+                      <p>Lokaler commit: <span className="font-mono text-gray-300">{updateStatus.localCommit.slice(0, 10)}</span></p>
+                    </div>
+                    <p className="mt-2 text-gray-400">
+                      Ausführung: <code className="bg-black/50 px-2 py-1">{updateStatus.instructions}</code>
+                    </p>
+                    <p className="mt-1 text-[11px] text-gray-500">Zuletzt geprüft: {new Date(updateStatus.lastCheckedAt).toLocaleString('de-CH')}</p>
+                    {updateStatus.updateAvailable && (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-[11px] text-gray-300">
+                        <li>Skript mit ausreichenden Rechten ausführen (z. B. <code className="bg-black/50 px-1">{updateStatus.instructions}</code>).</li>
+                        <li>Nach erfolgreichem Lauf Services testen und Version in den Einstellungen aktualisieren.</li>
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </CollapsibleSection>

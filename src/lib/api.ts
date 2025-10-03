@@ -229,5 +229,19 @@ export const api = {
 
   getLeaderboard() {
     return request<LeaderboardResponse>('/api/stats/leaderboard');
+  },
+
+  checkUpdates() {
+    type UpdateResponse = {
+      branch: string;
+      updateAvailable: boolean;
+      ahead: number;
+      behind: number;
+      localCommit: string;
+      remoteCommit: string;
+      instructions: string;
+      lastCheckedAt: string;
+    };
+    return request<UpdateResponse>('/api/admin/update/check');
   }
 };

@@ -1,14 +1,45 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
 # Gennerweb automated installation script for Ubuntu Server
+
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 if [[ $(id -u) -ne 0 ]]; then
   echo "[ERROR] Bitte als root oder mit sudo ausführen." >&2
   exit 1
 fi
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+read -rp "Installationsverzeichnis [/gennerweb]: " target_dir
+target_dir=${target_dir:-/gennerweb}
+target_dir=${target_dir%/}
+
+if [[ -e "$target_dir" && ! -d "$target_dir/.git" ]]; then
+  read -rp "Verzeichnis $target_dir existiert bereits. Für ein frisches Setup löschen? (j/n) [n]: " wipe_choice
+  wipe_choice=${wipe_choice:-n}
+  if [[ $wipe_choice =~ ^[Jj]$ ]]; then
+    rm -rf "$target_dir"
+  fi
+fi
+
+if [[ ! -d "$target_dir/.git" ]]; then
+  read -rp "Git Repository URL [https://github.com/pqlammy/Gennerweb.git]: " repo_url
+  repo_url=${repo_url:-https://github.com/pqlammy/Gennerweb.git}
+  read -rp "Branch [main]: " repo_branch
+  repo_branch=${repo_branch:-main}
+
+  mkdir -p "$target_dir"
+  chown "${SUDO_USER:-$(logname 2>/dev/null || echo root)}" "$target_dir"
+  sudo -u "${SUDO_USER:-$(logname 2>/dev/null || echo root)}" git clone --branch "$repo_branch" --depth 1 "$repo_url" "$target_dir"
+else
+  read -rp "Repository existiert bereits. Möchtest du es aktualisieren? (j/n) [j]: " update_existing
+  update_existing=${update_existing:-j}
+  if [[ $update_existing =~ ^[Jj]$ ]]; then
+    sudo -u "${SUDO_USER:-$(logname 2>/dev/null || echo root)}" git -C "$target_dir" fetch origin && \
+    sudo -u "${SUDO_USER:-$(logname 2>/dev/null || echo root)}" git -C "$target_dir" reset --hard origin/$(git -C "$target_dir" rev-parse --abbrev-ref HEAD)
+  fi
+fi
+
+SCRIPT_DIR=$(cd "$target_dir" && pwd)
 PROJECT_ROOT="$SCRIPT_DIR"
 ENV_FILE="$PROJECT_ROOT/.env"
 APP_USER="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
