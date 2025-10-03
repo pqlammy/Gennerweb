@@ -2259,6 +2259,16 @@ app.delete('/api/contributions/:id', authenticateToken, requireAdmin, async (req
   }
 });
 
+app.delete('/api/admin/contributions', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM contributions');
+    res.json({ success: true, deletedCount: result.rowCount });
+  } catch (error) {
+    console.error('Delete all contributions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 const escapeCsvValue = (value) => {
   const stringValue = value === null || value === undefined ? '' : String(value);
   if (/[",\n]/.test(stringValue)) {

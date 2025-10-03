@@ -148,6 +148,13 @@ export const api = {
     return request<{ success: boolean }>(`/api/contributions/${id}`, { method: 'DELETE' });
   },
 
+  deleteAllContributions() {
+    return request<{ success: boolean; deletedCount: number }>(
+      '/api/admin/contributions',
+      { method: 'DELETE' }
+    );
+  },
+
   importContributions(data: unknown[]) {
     return request<{ count: number; contributions: Contribution[] }>(
       '/api/admin/contributions/import',

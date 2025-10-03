@@ -77,6 +77,7 @@ export function AdminDashboard() {
   const [settlementFilter, setSettlementFilter] = useState('');
   const [bulkMarking, setBulkMarking] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
   const featureFlags = settings?.featureFlags ?? { leaderboard: false, healthMonitor: false };
 
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
@@ -205,6 +206,37 @@ export function AdminDashboard() {
     } catch (err) {
       console.error('Failed to delete contribution', err);
       setError('Beitrag konnte nicht gelöscht werden');
+    }
+  };
+
+  const handleDeleteAllContributions = async () => {
+    const confirmed = window.confirm(
+      'Möchtest du wirklich alle Beiträge unwiderruflich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.'
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeleteAllLoading(true);
+      setError(null);
+      setBulkMessage(null);
+      const result = await api.deleteAllContributions();
+      setContributions([]);
+      const deletedCount = result.deletedCount ?? 0;
+      const message =
+        deletedCount > 0
+          ? `${deletedCount} Beiträge gelöscht.`
+          : 'Es waren keine Beiträge zum Löschen vorhanden.';
+      setBulkMessage(message);
+      setTimeout(() => setBulkMessage(null), 3000);
+    } catch (err) {
+      console.error('Failed to delete all contributions', err);
+      setError(
+        err instanceof Error ? err.message : 'Alle Beiträge konnten nicht gelöscht werden'
+      );
+    } finally {
+      setDeleteAllLoading(false);
     }
   };
 
@@ -490,6 +522,23 @@ export function AdminDashboard() {
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Aktualisieren
+            </button>
+            <button
+              onClick={handleDeleteAllContributions}
+              disabled={deleteAllLoading}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-red-600/80 text-white hover:bg-red-600 disabled:opacity-60 w-full sm:w-auto"
+            >
+              {deleteAllLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Lösche...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Alle Einträge löschen
+                </>
+              )}
             </button>
           </div>
         </div>
