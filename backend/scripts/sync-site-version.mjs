@@ -137,8 +137,8 @@ const parseUpdateLogMarkdown = async () => {
       return;
     }
 
-    if (/^[-*]\s+/.test(trimmed)) {
-      const text = normalizeText(trimmed.replace(/^[-*]\s+/, ''));
+    if (/^[-*•]\s+/.test(trimmed)) {
+      const text = normalizeText(trimmed.replace(/^[-*•]\s+/, ''));
       if (text) {
         current.changes.push(text);
       }
@@ -163,7 +163,7 @@ const main = async () => {
   await loadEnvironment();
 
   const updateLog = await parseUpdateLogMarkdown();
-  const newest = updateLog[0];
+  const newest = updateLog[updateLog.length - 1];
   const versionLabel = newest.version;
 
   const dryRun = String(process.env.SYNC_SITE_VERSION_DRY_RUN || '').trim().toLowerCase() === '1';
