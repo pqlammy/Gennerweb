@@ -141,8 +141,12 @@ update_project() {
   deploy_frontend
 
   log "Synchronisiere Versionsinformationen …"
-  if ! run_in_backend "node ./scripts/sync-site-version.mjs"; then
-    log "Hinweis: Version konnte nicht synchronisiert werden – siehe obenstehende Fehlermeldung."
+  if [[ -f "$PROJECT_ROOT/backend/scripts/sync-site-version.mjs" ]]; then
+    if ! run_in_backend "node ./scripts/sync-site-version.mjs"; then
+      log "Hinweis: Version konnte nicht synchronisiert werden – siehe obenstehende Fehlermeldung."
+    fi
+  else
+    log "Hinweis: Sync-Skript nicht gefunden – überspringe Versionsabgleich."
   fi
 }
 
