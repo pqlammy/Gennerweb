@@ -110,6 +110,7 @@ export type SiteSettings = {
   primaryColor: string;
   primaryColorDark: string;
   accentColor: string;
+  mailAccentColor: string;
   brandMotto: string;
   navTitle: string;
   navSubtitle: string;

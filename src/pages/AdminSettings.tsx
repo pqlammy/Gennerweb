@@ -174,7 +174,7 @@ const DEFAULT_EMAIL_TEMPLATE_SNIPPET = `
 
 const wrapUserTemplateClient = (
   markup: string,
-  settings: Pick<SiteSettings, 'autoMailSubject' | 'primaryColor' | 'accentColor'>
+  settings: Pick<SiteSettings, 'autoMailSubject' | 'primaryColor' | 'mailAccentColor'>
 ) => {
   const trimmed = (markup ?? '').trim();
   if (trimmed.length === 0) {
@@ -186,7 +186,7 @@ const wrapUserTemplateClient = (
   }
 
   const primaryColor = settings.primaryColor || '#dc2626';
-  const accentColor = settings.accentColor || '#f97316';
+  const mailAccentColor = settings.mailAccentColor || '#f97316';
   const subject = settings.autoMailSubject || 'Genner Gibelguuger';
 
   return `<!DOCTYPE html>
@@ -199,10 +199,10 @@ const wrapUserTemplateClient = (
       .email-wrapper { width: 100%; padding: 24px 0; }
       .email-container { width: 100%; max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 20px; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14); overflow: hidden; }
       .email-header {
-        border-bottom: 4px solid ${accentColor};
+        border-bottom: 4px solid ${mailAccentColor};
         background: ${primaryColor};
         background-color: ${primaryColor};
-        background-image: linear-gradient(135deg, ${primaryColor}, ${accentColor});
+        background-image: linear-gradient(135deg, ${primaryColor}, ${mailAccentColor});
         background-repeat: no-repeat;
         background-size: cover;
         color: #ffffff;
@@ -216,14 +216,14 @@ const wrapUserTemplateClient = (
       .email-content li { margin: 6px 0; }
       .email-footer { padding: 20px 28px 28px; background: #f8fafc; color: #475569; font-size: 12px; text-align: center; }
       .email-footer p { margin: 6px 0; }
-      .button { display: inline-block; background: ${accentColor}; color: #ffffff !important; text-decoration: none; padding: 12px 20px; border-radius: 999px; font-weight: 600; }
+      .button { display: inline-block; background: ${mailAccentColor}; color: #ffffff !important; text-decoration: none; padding: 12px 20px; border-radius: 999px; font-weight: 600; }
       @media (max-width: 600px) { .email-content { padding: 24px 20px; } }
     </style>
   </head>
   <body>
     <div class="email-wrapper">
       <div class="email-container">
-        <div class="email-header" style="background-color: ${primaryColor}; border-bottom: 4px solid ${accentColor}; background-image: linear-gradient(135deg, ${primaryColor}, ${accentColor}); background-repeat: no-repeat; background-size: cover;">
+        <div class="email-header" style="background-color: ${primaryColor}; border-bottom: 4px solid ${mailAccentColor}; background-image: linear-gradient(135deg, ${primaryColor}, ${mailAccentColor}); background-repeat: no-repeat; background-size: cover;">
           <!--[if mso]>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${primaryColor};" bgcolor="${primaryColor}">
             <tr>
@@ -298,6 +298,7 @@ export function AdminSettings() {
         const data = await api.getAdminSettings();
         setForm({
           ...data,
+          mailAccentColor: data.mailAccentColor ?? data.accentColor ?? '#f97316',
           privacyPolicy: data.privacyPolicy && data.privacyPolicy.trim().length > 0
             ? data.privacyPolicy
             : DEFAULT_PRIVACY_POLICY,
@@ -638,11 +639,11 @@ export function AdminSettings() {
   };
 
   const handleUpdateLogChangesText = (index: number, value: string) => {
-    const changes = value
+    const normalized = value
+      .replace(/\r\n/g, '\n')
       .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-    handleUpdateLogChange(index, { changes });
+      .map((line) => line.replace(/\s+$/g, '')); // preserve leading characters while removing trailing spaces
+    handleUpdateLogChange(index, { changes: normalized });
   };
 
   const handleAddUpdateLogEntry = () => {
@@ -681,7 +682,18 @@ export function AdminSettings() {
     setSuccess(null);
 
     try {
-      const updated = await api.updateSiteSettings(form);
+      const sanitizedPayload: SiteSettings = {
+        ...form,
+        updateLog: form.updateLog.map((entry) => ({
+          version: entry.version.trim(),
+          date: entry.date ? entry.date.slice(0, 10) : null,
+          changes: entry.changes
+            .map((line) => line.replace(/\s+$/g, ''))
+            .filter((line) => line.trim().length > 0)
+        }))
+      };
+
+      const updated = await api.updateSiteSettings(sanitizedPayload);
       setForm(updated);
       setSuccess('Einstellungen gespeichert.');
       setLogoError(null);
@@ -718,17 +730,23 @@ export function AdminSettings() {
 
   const emailPreviewHtml = useMemo(() => {
     const templateSource = typeof form?.autoMailTemplate === 'string' ? form.autoMailTemplate : '';
-    const previewSettings: Pick<SiteSettings, 'autoMailSubject' | 'primaryColor' | 'accentColor'> = {
+    const previewSettings: Pick<SiteSettings, 'autoMailSubject' | 'primaryColor' | 'mailAccentColor'> = {
       autoMailSubject: form?.autoMailSubject ?? '',
       primaryColor: form?.primaryColor ?? '',
-      accentColor: form?.accentColor ?? ''
+      mailAccentColor: form?.mailAccentColor ?? form?.accentColor ?? ''
     };
     const wrapped = wrapUserTemplateClient(templateSource, previewSettings);
     if (wrapped) {
       return wrapped;
     }
     return wrapUserTemplateClient(DEFAULT_EMAIL_TEMPLATE_SNIPPET, previewSettings);
-  }, [form?.autoMailTemplate, form?.autoMailSubject, form?.primaryColor, form?.accentColor]);
+  }, [
+    form?.autoMailTemplate,
+    form?.autoMailSubject,
+    form?.primaryColor,
+    form?.mailAccentColor,
+    form?.accentColor
+  ]);
 
   if (loading || !form) {
     return (
@@ -825,7 +843,7 @@ export function AdminSettings() {
                 />
               </label>
             </div>
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-5">
               <label className="text-sm text-gray-300 flex flex-col">
                 Primärfarbe
                 <input
@@ -854,6 +872,15 @@ export function AdminSettings() {
                 />
               </label>
               <label className="text-sm text-gray-300 flex flex-col">
+                Mail-Akzentfarbe
+                <input
+                  type="color"
+                  value={form.mailAccentColor}
+                  onChange={(event) => handleFieldChange('mailAccentColor', event.target.value)}
+                  className="mt-2 h-12 w-full cursor-pointer rounded-md border border-white/20 bg-transparent"
+                />
+              </label>
+              <label className="text-sm text-gray-300 flex flex-col">
                 Logofarben-Fallback
                 <input
                   type="color"
@@ -875,6 +902,10 @@ export function AdminSettings() {
               <div className="flex-1 min-w-[160px]">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Akzent</p>
                 <div className="mt-2 h-12 rounded-md shadow-inner" style={{ backgroundColor: form.accentColor }}></div>
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Mail-Akzent</p>
+                <div className="mt-2 h-12 rounded-md shadow-inner" style={{ backgroundColor: form.mailAccentColor }}></div>
               </div>
               <div className="flex-1 min-w-[160px]">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Logo</p>

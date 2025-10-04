@@ -73,7 +73,8 @@ export const renderMarkdownDocument = (markdown: string): string => {
         html.push(`</${state.list}>`);
       }
       state.list = type;
-      html.push(`<${type} class="list-inside space-y-1 pl-5 marker:text-[var(--accent-color)]">`);
+      const baseClasses = type === 'ul' ? 'list-disc' : 'list-decimal';
+      html.push(`<${type} class="${baseClasses} list-inside space-y-1 pl-5 marker:text-[var(--accent-color)]">`);
     }
   };
 
@@ -167,7 +168,7 @@ export const renderMarkdownList = (markdown: string): string => {
     .map((item) => `<li class="text-sm text-gray-200">${applyInlineFormatting(item)}</li>`)
     .join('');
 
-  return `<ul class="list-inside space-y-1 pl-5 marker:text-[var(--accent-color)]">${listItems}</ul>`;
+  return `<ul class="list-disc list-inside space-y-1 pl-5 marker:text-[var(--accent-color)]">${listItems}</ul>`;
 };
 
 export const renderMarkdownInline = (markdown: string): string => applyInlineFormatting(markdown ?? '');

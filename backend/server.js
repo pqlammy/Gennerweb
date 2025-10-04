@@ -375,7 +375,9 @@ const wrapUserTemplate = (markup, settings) => {
   }
 
   const primaryColor = settings.primaryColor || defaultSiteSettings.primaryColor;
-  const accentColor = settings.accentColor || defaultSiteSettings.accentColor;
+  const mailAccentColor = settings.mailAccentColor
+    || settings.accentColor
+    || defaultSiteSettings.mailAccentColor;
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -404,10 +406,10 @@ const wrapUserTemplate = (markup, settings) => {
         overflow: hidden;
       }
       .email-header {
-        border-bottom: 4px solid ${accentColor};
+        border-bottom: 4px solid ${mailAccentColor};
         background: ${primaryColor};
         background-color: ${primaryColor};
-        background-image: linear-gradient(135deg, ${primaryColor}, ${accentColor});
+        background-image: linear-gradient(135deg, ${primaryColor}, ${mailAccentColor});
         background-repeat: no-repeat;
         background-size: cover;
         color: #ffffff;
@@ -438,7 +440,7 @@ const wrapUserTemplate = (markup, settings) => {
       }
       .button {
         display: inline-block;
-        background: ${accentColor};
+        background: ${mailAccentColor};
         color: #ffffff !important;
         text-decoration: none;
         padding: 12px 20px;
@@ -455,7 +457,7 @@ const wrapUserTemplate = (markup, settings) => {
   <body>
     <div class="email-wrapper">
       <div class="email-container">
-        <div class="email-header" style="background-color: ${primaryColor}; border-bottom: 4px solid ${accentColor}; background-image: linear-gradient(135deg, ${primaryColor}, ${accentColor}); background-repeat: no-repeat; background-size: cover;">
+        <div class="email-header" style="background-color: ${primaryColor}; border-bottom: 4px solid ${mailAccentColor}; background-image: linear-gradient(135deg, ${primaryColor}, ${mailAccentColor}); background-repeat: no-repeat; background-size: cover;">
           <!--[if mso]>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${primaryColor};" bgcolor="${primaryColor}">
             <tr>
@@ -947,6 +949,7 @@ const defaultSiteSettings = {
   primaryColor: '#dc2626',
   primaryColorDark: '#b91c1c',
   accentColor: '#f97316',
+  mailAccentColor: '#f97316',
   loginLogoColor: '#dc2626',
   brandMotto: 'Mit Leidenschaft für unseren Verein.',
   navTitle: 'Genner Gibelguuger',
@@ -1125,6 +1128,7 @@ const mapSettingsRow = (row) => {
     primaryColor: row.primary_color || defaultSiteSettings.primaryColor,
     primaryColorDark: row.primary_color_dark || defaultSiteSettings.primaryColorDark,
     accentColor: row.accent_color || defaultSiteSettings.accentColor,
+    mailAccentColor: row.mail_accent_color || row.accent_color || defaultSiteSettings.mailAccentColor,
     brandMotto: row.brand_motto || defaultSiteSettings.brandMotto,
     navTitle: row.nav_title || defaultSiteSettings.navTitle,
     navSubtitle: row.nav_subtitle || defaultSiteSettings.navSubtitle,
@@ -1463,6 +1467,7 @@ const initializeDatabase = async () => {
       primary_color text NOT NULL DEFAULT '#dc2626',
       primary_color_dark text NOT NULL DEFAULT '#b91c1c',
       accent_color text NOT NULL DEFAULT '#f97316',
+      mail_accent_color text NOT NULL DEFAULT '#f97316',
       target_amount numeric DEFAULT 100,
       goal_deadline date,
       welcome_message text DEFAULT 'Herzlich willkommen beim Genner Gibelguuger!',
@@ -1487,6 +1492,7 @@ const initializeDatabase = async () => {
   await pool.query("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS login_logo_color text DEFAULT '#dc2626'");
   await pool.query('ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS login_logo_size integer DEFAULT 96');
   await pool.query('ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS auto_mail_template text');
+  await pool.query("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_accent_color text DEFAULT '#f97316'");
   await pool.query('ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS brand_motto text');
   await pool.query('ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS nav_title text');
   await pool.query('ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS nav_subtitle text');
@@ -1568,6 +1574,13 @@ const initializeDatabase = async () => {
      SET feature_flags = $1::jsonb
      WHERE feature_flags IS NULL OR jsonb_typeof(feature_flags) <> 'object'`,
     [JSON.stringify(defaultFeatureFlags)]
+  );
+
+  await pool.query(
+    `UPDATE site_settings
+     SET mail_accent_color = COALESCE(NULLIF(mail_accent_color, ''), accent_color, $1)
+     WHERE mail_accent_color IS NULL OR TRIM(mail_accent_color) = ''`,
+    [defaultSiteSettings.mailAccentColor]
   );
 
   const defaultPrivacyLiteral = sqlEscapeLiteral(DEFAULT_PRIVACY_POLICY);
@@ -2763,6 +2776,7 @@ app.put('/api/admin/settings', authenticateToken, requireAdmin, async (req, res)
       primaryColor = current.primaryColor,
       primaryColorDark = current.primaryColorDark,
       accentColor = current.accentColor,
+      mailAccentColor = current.mailAccentColor,
       targetAmount = current.targetAmount,
       goalDeadline = current.goalDeadline,
       welcomeMessage = current.welcomeMessage,
@@ -2797,6 +2811,7 @@ app.put('/api/admin/settings', authenticateToken, requireAdmin, async (req, res)
     const normalizedPrimaryColor = typeof primaryColor === 'string' ? primaryColor.trim() : primaryColor;
     const normalizedPrimaryColorDark = typeof primaryColorDark === 'string' ? primaryColorDark.trim() : primaryColorDark;
     const normalizedAccentColor = typeof accentColor === 'string' ? accentColor.trim() : accentColor;
+    const normalizedMailAccentColor = typeof mailAccentColor === 'string' ? mailAccentColor.trim() : mailAccentColor;
     const normalizedLoginLogoColorInput = typeof loginLogoColor === 'string' ? loginLogoColor.trim() : loginLogoColor;
 
     if (!colorPattern.test(normalizedPrimaryColor)) {
@@ -2809,6 +2824,10 @@ app.put('/api/admin/settings', authenticateToken, requireAdmin, async (req, res)
 
     if (!colorPattern.test(normalizedAccentColor)) {
       return res.status(400).json({ error: 'Akzentfarbe ist ungültig' });
+    }
+
+    if (!colorPattern.test(normalizedMailAccentColor)) {
+      return res.status(400).json({ error: 'Mail-Akzentfarbe ist ungültig' });
     }
 
     if (!colorPattern.test(normalizedLoginLogoColorInput)) {
@@ -3043,39 +3062,41 @@ app.put('/api/admin/settings', authenticateToken, requireAdmin, async (req, res)
        SET primary_color = $1,
            primary_color_dark = $2,
            accent_color = $3,
-           target_amount = $4,
-           goal_deadline = $5,
-           welcome_message = $6,
-           success_message = $7,
-           auto_mail_subject = $8,
-           auto_mail_body = $9,
-           auto_mail_template = $10,
-           version_label = $11,
-           update_log = $12::jsonb,
-           login_logo_svg = $13,
-           login_logo_color = $14,
-           login_logo_size = $15,
-           legal_contact = $16,
-           privacy_policy = $17,
-           brand_motto = $18,
-           nav_title = $19,
-           nav_subtitle = $20,
-           landing_cta_title = $21,
-           landing_cta_body = $22,
-           landing_cta_button_label = $23,
-           landing_cta_button_url = $24,
-           footer_text = $25,
-           footer_links = $26::jsonb,
-           social_links = $27::jsonb,
-           form_configuration = $28::jsonb,
-           background_style = $29::jsonb,
-           feature_flags = $30::jsonb,
+           mail_accent_color = $4,
+           target_amount = $5,
+           goal_deadline = $6,
+           welcome_message = $7,
+           success_message = $8,
+           auto_mail_subject = $9,
+           auto_mail_body = $10,
+           auto_mail_template = $11,
+           version_label = $12,
+           update_log = $13::jsonb,
+           login_logo_svg = $14,
+           login_logo_color = $15,
+           login_logo_size = $16,
+           legal_contact = $17,
+           privacy_policy = $18,
+           brand_motto = $19,
+           nav_title = $20,
+           nav_subtitle = $21,
+           landing_cta_title = $22,
+           landing_cta_body = $23,
+           landing_cta_button_label = $24,
+           landing_cta_button_url = $25,
+           footer_text = $26,
+           footer_links = $27::jsonb,
+           social_links = $28::jsonb,
+           form_configuration = $29::jsonb,
+           background_style = $30::jsonb,
+           feature_flags = $31::jsonb,
            updated_at = now()
-       WHERE id = $31`,
+       WHERE id = $32`,
       [
         normalizedPrimaryColor,
         normalizedPrimaryColorDark,
         normalizedAccentColor,
+        normalizedMailAccentColor,
         numericTarget,
         normalizedDeadline,
         normalizedWelcome,
