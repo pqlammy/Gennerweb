@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
@@ -79,6 +79,9 @@ export function AdminDashboard() {
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
   const featureFlags = settings?.featureFlags ?? { leaderboard: false, healthMonitor: false };
+
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const deferredSettlementFilter = useDeferredValue(settlementFilter);
 
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
   const [leaderboardGeneratedAt, setLeaderboardGeneratedAt] = useState<string | null>(null);
@@ -359,16 +362,16 @@ export function AdminDashboard() {
   }, [contributions]);
 
   const filteredContributions = useMemo(() => {
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = deferredSearchTerm.toLowerCase();
     const minAmountValue = Number.parseFloat(minAmount);
     const maxAmountValue = Number.parseFloat(maxAmount);
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
-    const settlementFilterLower = settlementFilter.trim().toLowerCase();
+    const settlementFilterLower = deferredSettlementFilter.trim().toLowerCase();
 
     let entries = contributions.filter((contribution) => {
       const matchesSearch =
-        searchTerm === '' ||
+        deferredSearchTerm === '' ||
         contribution.first_name.toLowerCase().includes(searchLower) ||
         contribution.last_name.toLowerCase().includes(searchLower) ||
         contribution.email.toLowerCase().includes(searchLower) ||
@@ -441,11 +444,11 @@ export function AdminDashboard() {
     filterStatus,
     maxAmount,
     minAmount,
-    searchTerm,
+    deferredSearchTerm,
     sortOption,
     startDate,
     gennervogtFilter,
-    settlementFilter
+    deferredSettlementFilter
   ]);
 
   const filteredTotalAmount = useMemo(

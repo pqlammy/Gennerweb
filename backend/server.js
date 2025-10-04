@@ -153,6 +153,14 @@ for (const key of requiredEnvVars) {
   }
 }
 
+const ensureSecretStrength = (value, label, minLength) => {
+  if (!value || value.trim().length < minLength) {
+    throw new Error(`${label} must be at least ${minLength} characters long.`);
+  }
+};
+
+ensureSecretStrength(process.env.JWT_SECRET, 'JWT_SECRET', 32);
+
 const resolveEncryptionKey = (value, label = 'ENCRYPTION_KEY') => {
   if (!value || value.trim() === '') {
     throw new Error(`Missing required environment variable: ${label}`);
@@ -1246,6 +1254,88 @@ const logLoginAttempt = async ({ userId, ip, success }) => {
   }
 };
 
+const MAX_FAILED_ATTEMPTS = Number.parseInt(process.env.LOGIN_FAIL_THRESHOLD || '5', 10);
+const LOCKOUT_WINDOW_MS = Number.parseInt(process.env.LOGIN_FAIL_WINDOW_MS || String(15 * 60 * 1000), 10);
+const LOCKOUT_DURATION_MS = Number.parseInt(process.env.LOGIN_FAIL_LOCKOUT_MS || String(15 * 60 * 1000), 10);
+const failedLoginAttempts = new Map();
+
+const failureMapKey = (username, ip) => `${username || 'unknown'}|${ip || 'unknown'}`;
+
+const scheduleFailureCleanup = (key, ttl) => {
+  const timer = setTimeout(() => {
+    const record = failedLoginAttempts.get(key);
+    if (!record) {
+      return;
+    }
+    const now = Date.now();
+    const windowExpired = record.firstFailedAt + LOCKOUT_WINDOW_MS <= now;
+    const lockExpired = !record.lockUntil || record.lockUntil <= now;
+    if (windowExpired && lockExpired) {
+      failedLoginAttempts.delete(key);
+    }
+  }, ttl);
+  if (typeof timer.unref === 'function') {
+    timer.unref();
+  }
+};
+
+const getLockoutStatus = (username, ip) => {
+  if (MAX_FAILED_ATTEMPTS <= 0) {
+    return { locked: false };
+  }
+
+  const key = failureMapKey(username, ip);
+  const record = failedLoginAttempts.get(key);
+  if (!record) {
+    return { locked: false };
+  }
+
+  const now = Date.now();
+
+  if (record.lockUntil && record.lockUntil > now) {
+    return { locked: true, retryAfterMs: record.lockUntil - now };
+  }
+
+  if (record.firstFailedAt + LOCKOUT_WINDOW_MS <= now) {
+    failedLoginAttempts.delete(key);
+  }
+
+  return { locked: false };
+};
+
+const registerFailedLogin = (username, ip) => {
+  if (MAX_FAILED_ATTEMPTS <= 0) {
+    return;
+  }
+
+  const key = failureMapKey(username, ip);
+  const now = Date.now();
+  const existing = failedLoginAttempts.get(key);
+
+  let nextRecord;
+  if (existing && existing.firstFailedAt + LOCKOUT_WINDOW_MS > now) {
+    nextRecord = { ...existing, count: existing.count + 1 };
+  } else {
+    nextRecord = { count: 1, firstFailedAt: now, lockUntil: null };
+  }
+
+  if (nextRecord.count >= MAX_FAILED_ATTEMPTS) {
+    nextRecord.lockUntil = now + LOCKOUT_DURATION_MS;
+    nextRecord.count = 0;
+    nextRecord.firstFailedAt = now;
+  }
+
+  failedLoginAttempts.set(key, nextRecord);
+  scheduleFailureCleanup(key, Math.max(LOCKOUT_WINDOW_MS, LOCKOUT_DURATION_MS));
+};
+
+const clearFailedLogins = (username, ip) => {
+  if (MAX_FAILED_ATTEMPTS <= 0) {
+    return;
+  }
+  failedLoginAttempts.delete(failureMapKey(username, ip));
+};
+
 const basicFirewallPatterns = [
   /<script/i,
   /javascript:/i,
@@ -1565,13 +1655,18 @@ const cspDisabled = process.env.DISABLE_CSP === 'true';
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: 'same-origin' },
     frameguard: { action: 'deny' },
+    dnsPrefetchControl: { allow: false },
+    originAgentCluster: true,
     referrerPolicy: { policy: 'no-referrer' },
     hsts: {
       maxAge: 60 * 60 * 24 * 365,
       includeSubDomains: true,
       preload: true
     },
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
     contentSecurityPolicy: cspDisabled
       ? false
       : {
@@ -1700,6 +1795,17 @@ app.post('/auth/login', authLimiter, async (req, res) => {
     }
 
     const normalizedUsername = normalizeUsername(username);
+    const clientIp = getClientIp(req);
+
+    const lockStatus = getLockoutStatus(normalizedUsername, clientIp);
+    if (lockStatus.locked) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((lockStatus.retryAfterMs || 0) / 1000));
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({
+        error: 'Zu viele fehlgeschlagene Anmeldeversuche. Bitte versuche es später erneut.',
+        retryAfterSeconds
+      });
+    }
 
     if (!isValidUsername(normalizedUsername)) {
       return res.status(400).json({ error: 'Invalid username format' });
@@ -1714,9 +1820,10 @@ app.post('/auth/login', authLimiter, async (req, res) => {
     if (!user || !passwordMatches) {
       await logLoginAttempt({
         userId: user ? user.id : null,
-        ip: getClientIp(req),
+        ip: clientIp,
         success: false
       });
+      registerFailedLogin(normalizedUsername, clientIp);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -1729,9 +1836,11 @@ app.post('/auth/login', authLimiter, async (req, res) => {
 
     await logLoginAttempt({
       userId: user.id,
-      ip: getClientIp(req),
+      ip: clientIp,
       success: true
     });
+
+    clearFailedLogins(normalizedUsername, clientIp);
 
     res.json({
       token,

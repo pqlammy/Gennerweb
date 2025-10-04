@@ -31,7 +31,7 @@ Die Bearbeitung basiert auf deiner Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) sow
 Sämtliche Beitragsdaten werden verschlüsselt gespeichert. Wir bewahren sie mindestens ein Jahr sicher auf, um Rückfragen beantworten und Revisionen durchführen zu können. Nach Ablauf der gesetzlichen Aufbewahrungsfrist werden die Datensätze automatisiert gelöscht oder unwiderruflich anonymisiert. Individuelle Löschgesuche erfüllen wir – sofern keine gesetzlichen Pflichten entgegenstehen – innert 30 Tagen.
 
 ## 7. Datensicherheit
-Die Plattform wird ausschliesslich über HTTPS (TLS) betrieben. Content Security Policies, zusätzliche Sicherheitsheader sowie Verschlüsselung (AES-256-GCM) schützen vor gängigen Web-Angriffen. Zugriff haben nur berechtigte Administratoren. Zusätzlich schützen Rate-Limiting und automatische Überwachungsmechanismen vor DDoS- und Brute-Force-Angriffen.
+Die Plattform wird ausschliesslich über HTTPS (TLS) betrieben. Content Security Policies, zusätzliche Sicherheitsheader (HSTS, COOP, Referrer-Policy, DNS Prefetch Control) sowie Verschlüsselung (AES-256-GCM) schützen vor gängigen Web-Angriffen. Zugriff haben nur berechtigte Administratoren. Zusätzlich schützen mehrstufiges Rate-Limiting mit temporären Kontosperren und automatische Überwachungsmechanismen vor DDoS- und Brute-Force-Angriffen.
 
 ## 8. Weitergabe an Dritte
 Eine Weitergabe an Drittanbieter erfolgt nicht, ausser es besteht eine gesetzliche Verpflichtung oder es ist für den Vereinsabschluss zwingend (z. B. Treuhänder oder Revision). In solchen Fällen stellen wir sicher, dass die Empfänger ebenfalls den Datenschutz wahren.

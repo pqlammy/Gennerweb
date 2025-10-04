@@ -1954,13 +1954,13 @@ export function AdminSettings() {
                     <strong>JWT mit Ablauf & Signatur:</strong> Zugriffstokens laufen nach 24&nbsp;Stunden ab und werden mit einem geheimen Schlüssel signiert. Der Schlüssel lässt sich jederzeit rotieren.
                   </li>
                   <li>
-                    <strong>Ratenbegrenzung & Bruteforce-Schutz:</strong> Globales Throttling für alle Requests und ein strenges Limit für Login- und Registrierungsversuche.
+                    <strong>Ratenbegrenzung & Account-Lockout:</strong> Globales Throttling für alle Requests, pro-IP Limits für Login & Registrierung sowie automatische Sperren nach wiederholten Fehlversuchen (konfigurierbar via Umgebungsvariablen).
                   </li>
                   <li>
                     <strong>Web Application Firewall:</strong> Verdächtige Payloads (SQL- oder XSS-Muster) werden serverseitig verworfen; sämtliche Request-Bodies werden zusätzlich gegen Prototype-Pollution gesichert.
                   </li>
                   <li>
-                    <strong>Security-Header & CSP:</strong> Helmet setzt HSTS, Referrer-Policy und Content-Security-Policy (Scripts nur von <code>'self'</code>, Styles eingeschränkt). Optional kannst du mit <code>REQUIRE_HTTPS=true</code> HTTP automatisch auf HTTPS umleiten.
+                    <strong>Security-Header & CSP:</strong> Helmet erzwingt HSTS, COOP, DNS Prefetch Control und eine restriktive Content-Security-Policy (Scripts nur von <code>'self'</code>, Styles stark eingeschränkt). Optional kannst du mit <code>REQUIRE_HTTPS=true</code> HTTP automatisch auf HTTPS umleiten.
                   </li>
                   <li>
                     <strong>CORS & Origin Whitelist:</strong> Nur explizit erlaubte Hosts dürfen auf die API zugreifen; Token werden nicht an fremde Origins ausgeliefert.
@@ -1970,6 +1970,9 @@ export function AdminSettings() {
                   </li>
                   <li>
                     <strong>Parametrisierte Datenbankzugriffe:</strong> Alle Queries verwenden vorbereitete Statements, wodurch SQL-Injection verhindert wird.
+                  </li>
+                  <li>
+                    <strong>Versionierung & Änderungs-Log:</strong> Das Update-Skript synchronisiert automatisch das Markdown-Änderungsprotokoll mit der Datenbank, sodass Backend und Oberfläche immer denselben Stand anzeigen.
                   </li>
                 </ul>
                 <p className="text-xs text-gray-400">
